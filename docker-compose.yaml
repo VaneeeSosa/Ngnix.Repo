@@ -1,0 +1,103 @@
+version: '3.9'
+
+services:
+  mysql_db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: AuthDB
+      MYSQL_USER: sa
+      MYSQL_PASSWORD: 12345678
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot","-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  auth_api:
+    build:
+      context: ./Auth.Microservice/Microservices.Auth.Api/Microservices.Auth.Api
+      dockerfile: Dockerfile
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=AuthDB;User=sa;Password=12345678
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5000:80"
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+  product_api:
+    build:
+      context: ./DsiCode.Micro.Product.Api/DsiCode.Micro.Product.Api
+      dockerfile: Dockerfile
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=ProductDB;User=sa;Password=12345678
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5001:80"
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+  coupon_api:
+    build:
+      context: ./DsiCode.Micro.Coupon/Uttt.Micro.Cupon/Uttt.Micro.Cupon
+      dockerfile: Dockerfile
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=CouponDB;User=sa;Password=12345678
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5003:80"
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+  shopping_cart_api:
+    build:
+      context: ./DsiCode.Micro.Shopping/Dsicode.ShoppingCar.Api/Dsicode.ShoppingCar.Api/Dsicode.ShoppingCar.Api
+      dockerfile: Dockerfile
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=ShopingCarBD;User=sa;Password=12345678
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ServiceUrls__ProductAPI=http://product_api:80
+      - ServiceUrls__CouponAPI=http://coupon_api:80
+      - ServiceUrls__AuthAPI=http://auth_api:80
+    ports:
+      - "5002:80"
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+      product_api:
+        condition: service_started
+      coupon_api:
+        condition: service_started
+      auth_api:
+        condition: service_started
+
+  reverse_proxy:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./etc/nginx/sites-available/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+      auth_api:
+        condition: service_started
+      product_api:
+        condition: service_started
+      coupon_api:
+        condition: service_started
+      shopping_cart_api:
+        condition: service_started
+
+volumes:
+  mysql_data:
