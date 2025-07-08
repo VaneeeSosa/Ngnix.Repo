@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   mysql_db:
     image: mysql:8.0
@@ -17,12 +19,54 @@ services:
       retries: 10
 
   auth_api:
-    build: .
+    build: 
+      context: https://github.com/VaneeeSosa/Auth.Microservice.git
+      dockerfile: Microservices.Auth.Api/Dockerfile
     environment:
-      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=AuthDB;User=appuser;Password=AppUserPass
+      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=AuthDB;User=sa;Password=12345678
       - ASPNETCORE_ENVIRONMENT=Development
     ports:
       - "5000:80"
     depends_on:
       mysql_db:
         condition: service_healthy
+
+  # Nuevo servicio de carrito
+  shopping_cart_api:
+    build:
+      context: https://github.com/VaneeeSosa/DsiCode.Micro.Shopping.git
+      dockerfile: Dsicode.ShoppingCart.Api/Dockerfile
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=ShopingCarBD;User=sa;Password=12345678
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ServiceUrls__ProductAPI=http://product_api:80
+      - ServiceUrls__CouponAPI=http://coupon_api:80
+    ports:
+      - "5002:80"
+    depends_on:
+      - mysql_db
+      - auth_api
+
+  # Mantén tus otros servicios existentes
+  product_api:
+    build: 
+      context: https://github.com/VaneeeSosa/DsiCode.Micro.Product.Api.git
+      dockerfile: Microservices.Product.Api/Dockerfile
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=ProductDB;User=sa;Password=12345678
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5001:80"
+
+  coupon_api:
+    build: 
+      context: https://github.com/VaneeeSosa/DsiCode.Micro.Coupon.git
+      dockerfile: Microservices.Coupon.Api/Dockerfile
+    environment:
+    - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=CouponDB;User=sa;Password=12345678
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5003:80"
+
+volumes:
+  mysql_data:
